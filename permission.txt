@@ -1,0 +1,54 @@
+enum Permission {
+  // User-related permissions
+  USER_CREATE
+  USER_READ
+  USER_UPDATE
+  USER_DELETE
+  USER_ACTIVATE
+  USER_DEACTIVATE
+
+  // Role-related permissions
+  ROLE_CREATE
+  ROLE_READ
+  ROLE_UPDATE
+  ROLE_DELETE
+
+  // Doctor-related permissions
+  DOCTOR_CREATE
+  DOCTOR_READ
+  DOCTOR_UPDATE
+  DOCTOR_DELETE
+
+  // Patient-related permissions
+  PATIENT_CREATE
+  PATIENT_READ
+  PATIENT_UPDATE
+  PATIENT_DELETE
+  PATIENT_REFER
+  PATIENT_ACCEPT
+
+  // Schedule-related permissions
+  SCHEDULE_CREATE
+  SCHEDULE_READ
+  SCHEDULE_UPDATE
+  SCHEDULE_DELETE
+
+  // Department-related permissions
+  DEPARTMENT_CREATE
+  DEPARTMENT_READ
+  DEPARTMENT_UPDATE
+  DEPARTMENT_DELETE
+
+  // Notification-related permissions
+  NOTIFICATION_CREATE
+  NOTIFICATION_READ
+  NOTIFICATION_UPDATE
+  NOTIFICATION_DELETE
+
+  // Reporting-related permissions
+  REPORTS_VIEW
+  REPORTS_EXPORT
+
+  // Settings-related permissions
+  SETTINGS_MANAGE
+}

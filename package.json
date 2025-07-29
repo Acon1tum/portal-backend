@@ -1,0 +1,67 @@
+{
+  "name": "referral-backend",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [
+    "test"
+  ],
+  "homepage": "https://github.com/JCBEA/referral-backend#readme",
+  "bugs": {
+    "url": "https://github.com/JCBEA/referral-backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JCBEA/referral-backend.git"
+  },
+  "license": "ISC",
+  "author": "Quanby",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "test",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/index.ts",
+    "build": "tsc && npx prisma generate",
+    "start": "node dist/index.js",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:seed": "prisma db seed",
+    "prisma:push": "prisma db push --force-reset",
+    "prisma:reset": "prisma migrate reset",
+    "prisma:generate": "prisma generate",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.6.0",
+    "@reduxjs/toolkit": "^2.6.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "js-cookie": "^3.0.5",
+    "jsonwebtoken": "^9.0.2",
+    "react-redux": "^9.2.0",
+    "redux": "^5.0.1",
+    "resend": "^4.4.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/express-session": "^1.18.1",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/jwt-decode": "^2.2.1",
+    "@types/node": "^22.14.1",
+    "nodemon": "^3.1.9",
+    "prisma": "^6.6.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  }
+}

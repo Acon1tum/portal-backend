@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+      "target": "ES6",
+      "module": "CommonJS",
+      "rootDir": "./",
+      "outDir": "./dist",
+      "strict": true,
+      "esModuleInterop": true,
+      "allowSyntheticDefaultImports": true,
+      "typeRoots": ["./node_modules/@types", "./types", "./src/types"],
+      "types": ["node", "express-session"]
+    },
+    "include": ["src/**/*", "types/**/*"],
+    "exclude": ["node_modules", "dist"]
+  }
+  
