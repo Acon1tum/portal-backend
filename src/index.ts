@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import session from 'express-session'; // Import express-session
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import authRouter from './auth/login';
 import roleRouter from './roles-and-permissions/role';
 import editRoleRouter from './roles-and-permissions/edit-roles';
@@ -26,7 +28,22 @@ import updateMessage from './message/updateMessage'
 import deleteMessage from './message/deleteMessage'
 import updateMessageStatus from './message/updateMessageStatus'
 import emailAndPassSignup from './auth/signup-email-and-pass/signup'
+import activitiesRouter from './activities/activities'
+import { initializeWebSocket } from './utils/websocket';
+
 const app = express();
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: true, // Allow all origins
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  }
+});
+
+// Initialize WebSocket utility
+initializeWebSocket(io);
+
 const port = process.env.PORT || 3200;
 
 // Configure express-session. 
@@ -57,7 +74,7 @@ app.use('/auth', authRouter);
 
 
 // signup for email and password only
-app.use('/auth/signup-email-and-pass/signup', emailAndPassSignup);
+app.use('/auth/signup', emailAndPassSignup);
 
 
 app.use('/auth/check-session', checkSessionRouter); // Check session endpoint
@@ -88,12 +105,68 @@ app.use('/messages/update', updateMessage)
 app.use('/messages/delete', deleteMessage)
 app.use('/messages/status', updateMessageStatus)
 
+// activities
+app.use('/activities', activitiesRouter)
+
 
 // Basic route
 app.get('/', (req: Request, res: Response) => {
   res.send('Hello from Express with TypeScript!');
 });
 
-app.listen(port, () => {
+// WebSocket connection handling
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  // Handle user joining a room (e.g., for business-specific messages)
+  socket.on('join-room', (roomId) => {
+    socket.join(roomId);
+    console.log(`User ${socket.id} joined room: ${roomId}`);
+  });
+
+  // Handle user leaving a room
+  socket.on('leave-room', (roomId) => {
+    socket.leave(roomId);
+    console.log(`User ${socket.id} left room: ${roomId}`);
+  });
+
+  // Handle private messages
+  socket.on('private-message', (data) => {
+    const { recipientId, message } = data;
+    socket.to(recipientId).emit('private-message', {
+      senderId: socket.id,
+      message: message,
+      timestamp: new Date()
+    });
+  });
+
+  // Handle business updates
+  socket.on('business-update', (data) => {
+    const { businessId, update } = data;
+    socket.to(`business-${businessId}`).emit('business-updated', {
+      businessId,
+      update,
+      timestamp: new Date()
+    });
+  });
+
+  // Handle message creation
+  socket.on('new-message', (data) => {
+    const { businessId, message } = data;
+    socket.to(`business-${businessId}`).emit('message-created', {
+      message,
+      timestamp: new Date()
+    });
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+// Change from app.listen to server.listen
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
+  console.log(`WebSocket server is ready for connections`);
 });
