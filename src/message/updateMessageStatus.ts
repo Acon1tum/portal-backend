@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient, MessageStatus } from '@prisma/client'
 import { asyncHandler } from '../utils/asyncHandler'
+import { broadcastUserMessageStatusUpdate } from '../utils/websocket'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -22,6 +23,13 @@ router.put(
         where: { id: req.params.id },
         data: { status }
       })
+
+      // Broadcast the status update to both sender and receiver
+      try {
+        broadcastUserMessageStatusUpdate(updated.senderId, updated.userId, updated.id, status)
+      } catch (error) {
+        console.error('Failed to broadcast message status update:', error)
+      }
 
       res.json(updated)
     } catch (error) {

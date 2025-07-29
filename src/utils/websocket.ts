@@ -33,6 +33,14 @@ export const broadcastToUser = (userId: string, event: string, data: any) => {
   socketIO.to(userId).emit(event, data);
 };
 
+// Broadcast to multiple users (for user-to-user chat)
+export const broadcastToUsers = (userIds: string[], event: string, data: any) => {
+  const socketIO = getIO();
+  userIds.forEach(userId => {
+    socketIO.to(userId).emit(event, data);
+  });
+};
+
 // Broadcast business updates
 export const broadcastBusinessUpdate = (businessId: string, update: any) => {
   broadcastToRoom(`business-${businessId}`, 'business-updated', {
@@ -42,7 +50,7 @@ export const broadcastBusinessUpdate = (businessId: string, update: any) => {
   });
 };
 
-// Broadcast new message
+// Broadcast new message (business-based)
 export const broadcastNewMessage = (businessId: string, message: any) => {
   broadcastToRoom(`business-${businessId}`, 'message-created', {
     message,
@@ -50,12 +58,38 @@ export const broadcastNewMessage = (businessId: string, message: any) => {
   });
 };
 
-// Broadcast message status update
+// Broadcast new user-to-user message
+export const broadcastUserMessage = (senderId: string, receiverId: string, message: any) => {
+  const socketIO = getIO();
+  // Broadcast to both sender and receiver
+  const targetUsers = [senderId, receiverId];
+  targetUsers.forEach(userId => {
+    socketIO.to(userId).emit('message-created', {
+      message,
+      timestamp: new Date()
+    });
+  });
+};
+
+// Broadcast message status update (business-based)
 export const broadcastMessageStatusUpdate = (businessId: string, messageId: string, status: string) => {
   broadcastToRoom(`business-${businessId}`, 'message-status-updated', {
     messageId,
     status,
     timestamp: new Date()
+  });
+};
+
+// Broadcast user-to-user message status update
+export const broadcastUserMessageStatusUpdate = (senderId: string, receiverId: string, messageId: string, status: string) => {
+  const socketIO = getIO();
+  const targetUsers = [senderId, receiverId];
+  targetUsers.forEach(userId => {
+    socketIO.to(userId).emit('message-status-updated', {
+      messageId,
+      status,
+      timestamp: new Date()
+    });
   });
 };
 

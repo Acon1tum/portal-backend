@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { PrismaClient, MessageStatus } from '@prisma/client'
 import { asyncHandler } from '../utils/asyncHandler'
-import { broadcastNewMessage } from '../utils/websocket'
+import { broadcastUserMessage } from '../utils/websocket'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -25,11 +25,9 @@ router.post(
       }
     })
 
-    // Broadcast the new message to all users in the business room
-    // Assuming userId is the businessId for this example
-    // You might need to adjust this based on your data structure
+    // Broadcast the new message to both sender and receiver
     try {
-      broadcastNewMessage(userId, message)
+      broadcastUserMessage(senderId, userId, message)
     } catch (error) {
       console.error('Failed to broadcast message:', error)
     }

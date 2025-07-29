@@ -29,7 +29,7 @@ import deleteMessage from './message/deleteMessage'
 import updateMessageStatus from './message/updateMessageStatus'
 import emailAndPassSignup from './auth/signup-email-and-pass/signup'
 import activitiesRouter from './activities/activities'
-import { initializeWebSocket } from './utils/websocket';
+import { initializeWebSocket, getIO } from './utils/websocket';
 
 const app = express();
 const server = createServer(app);
@@ -118,6 +118,30 @@ app.get('/', (req: Request, res: Response) => {
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
 
+  // Handle user authentication and join their personal room
+  socket.on('authenticate', (data) => {
+    console.log('Backend received authentication:', data);
+    const { userId, userEmail } = data;
+    if (userId) {
+      // Join user's personal room for receiving messages
+      socket.join(userId);
+      console.log(`User ${userId} (${userEmail}) authenticated and joined room: ${userId}`);
+      console.log('Current socket rooms:', Array.from(socket.rooms));
+      
+      // Send a test message to confirm connection
+      socket.emit('test-message', {
+        message: 'WebSocket connection established successfully!',
+        timestamp: new Date()
+      });
+    }
+  });
+
+  // Handle ping for testing connection
+  socket.on('ping', () => {
+    console.log('Received ping from client');
+    socket.emit('pong', { timestamp: new Date() });
+  });
+
   // Handle user joining a room (e.g., for business-specific messages)
   socket.on('join-room', (roomId) => {
     socket.join(roomId);
@@ -150,13 +174,59 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle message creation
+  // Handle message creation (business-based)
   socket.on('new-message', (data) => {
     const { businessId, message } = data;
     socket.to(`business-${businessId}`).emit('message-created', {
       message,
       timestamp: new Date()
     });
+  });
+
+  // Handle user-to-user message sending
+  socket.on('send-message', (data) => {
+    console.log('Backend received send-message event:', data);
+    const { message, receiverId } = data;
+    // Broadcast to both sender and receiver using global io
+    const socketIO = getIO();
+    socketIO.to(receiverId).emit('message-created', {
+      message,
+      timestamp: new Date()
+    });
+    console.log(`Broadcasting message to user: ${receiverId}`);
+  });
+
+  // Handle message deletion
+  socket.on('delete-message', (data) => {
+    console.log('Backend received delete-message event:', data);
+    const { messageId, senderId, receiverId } = data;
+    // Broadcast deletion to both users using global io
+    const socketIO = getIO();
+    const targetUsers = [senderId, receiverId];
+    targetUsers.forEach(userId => {
+      socketIO.to(userId).emit('message-deleted', {
+        messageId,
+        timestamp: new Date()
+      });
+    });
+    console.log(`Broadcasting message deletion to users: ${targetUsers.join(', ')}`);
+  });
+
+  // Handle message status updates
+  socket.on('update-message-status', (data) => {
+    console.log('Backend received update-message-status event:', data);
+    const { messageId, status, senderId, receiverId } = data;
+    // Broadcast status update to both users using global io
+    const socketIO = getIO();
+    const targetUsers = [senderId, receiverId];
+    targetUsers.forEach(userId => {
+      socketIO.to(userId).emit('message-status-updated', {
+        messageId,
+        status,
+        timestamp: new Date()
+      });
+    });
+    console.log(`Broadcasting status update to users: ${targetUsers.join(', ')}`);
   });
 
   // Handle disconnection
