@@ -29,6 +29,7 @@ import deleteMessage from './message/deleteMessage'
 import updateMessageStatus from './message/updateMessageStatus'
 import emailAndPassSignup from './auth/signup-email-and-pass/signup'
 import activitiesRouter from './activities/activities'
+import postingRouter from './posting/posting'
 import { initializeWebSocket, getIO } from './utils/websocket';
 
 const app = express();
@@ -107,6 +108,9 @@ app.use('/messages/status', updateMessageStatus)
 
 // activities
 app.use('/activities', activitiesRouter)
+
+// postings
+app.use('/postings', postingRouter)
 
 
 // Basic route
