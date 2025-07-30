@@ -249,7 +249,7 @@ model Posting {
 
 model PostingAttachment {
   id         String   @id @default(uuid()) @db.Uuid
-  url        String
+  url        String   // This will store base64 data or cloud storage URLs
   fileName   String?
   fileType   String?
   size       Int?

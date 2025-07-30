@@ -207,10 +207,10 @@ router.get('/type/:postType', asyncHandler(async (req, res) => {
 
 // Create new posting
 router.post('/create', asyncHandler(async (req, res) => {
-  const { title, content, postType, isPublished = false } = req.body;
+  const { title, content, postType, isPublished = false, attachments = [] } = req.body;
   const userId = (req.session as any).user?.id;
 
-  console.log('Create posting request:', { title, content, postType, isPublished, userId });
+  console.log('Create posting request:', { title, content, postType, isPublished, userId, attachmentsCount: attachments.length });
 
   if (!userId) {
     console.log('No user ID found in session');
@@ -275,35 +275,59 @@ router.post('/create', asyncHandler(async (req, res) => {
   }
 
   try {
-    const posting = await prisma.posting.create({
-      data: {
-        title,
-        content,
-        postType,
-        isPublished,
-        organizationId: organizationId,
-        createdById: userId,
-      },
-      include: {
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            logo: true,
-          }
+    // Create the posting with attachments in a transaction
+    const posting = await prisma.$transaction(async (tx) => {
+      // Create the posting first
+      const newPosting = await tx.posting.create({
+        data: {
+          title,
+          content,
+          postType,
+          isPublished,
+          organizationId: organizationId,
+          createdById: userId,
         },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
+      });
+
+      // Create attachments if provided
+      if (attachments && attachments.length > 0) {
+        const attachmentData = attachments.map((attachment: any) => ({
+          url: attachment.url, // This will be the base64 data
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+          size: attachment.size,
+          postingId: newPosting.id,
+        }));
+
+        await tx.postingAttachment.createMany({
+          data: attachmentData,
+        });
+      }
+
+      // Return the posting with all related data
+      return await tx.posting.findUnique({
+        where: { id: newPosting.id },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              logo: true,
+            }
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+          attachments: true,
         },
-        attachments: true,
-      },
+      });
     });
 
-    console.log('Posting created successfully:', posting.id);
+    console.log('Posting created successfully:', posting?.id);
     res.status(201).json(posting);
   } catch (error) {
     console.error('Error creating posting:', error);
