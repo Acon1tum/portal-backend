@@ -1,13 +1,17 @@
 // prisma/seed.ts
 import { PrismaClient, Sex, Status, VerificationStatus, MessageStatus, WeekDay, UserRole, UserType, CurrentJobStatus, PostType } from '@prisma/client';
+import process from 'node:process';
 import * as bcrypt from 'bcryptjs';
 // This is only needed for TypeScript to recognize the Node.js process object
 /// <reference types="node" />
 
 const prisma = new PrismaClient();
+const prismaAny = prisma as any; // Temporary cast to access newly added models before Prisma generate
 
 async function main() {
   // Clean up existing data
+  await prismaAny.comment?.deleteMany();
+  await prismaAny.postingFavorite?.deleteMany();
   await prisma.message.deleteMany();
   await prisma.review.deleteMany();
   await prisma.teamMember.deleteMany();
@@ -408,7 +412,7 @@ async function main() {
   });
 
   // Create job postings
-  await prisma.posting.create({
+  const post1 = await prisma.posting.create({
     data: {
       title: 'Chief Engineer - Container Vessel',
       content: 'We are seeking an experienced Chief Engineer for a 5000 TEU container vessel. Requirements: STCW III/2, 3+ years as Chief Engineer, experience with MAN B&W engines. Contract: 4 months on/2 months off. Competitive salary and benefits.',
@@ -419,7 +423,7 @@ async function main() {
     }
   });
 
-  await prisma.posting.create({
+  const post2 = await prisma.posting.create({
     data: {
       title: 'Master Mariner - Bulk Carrier',
       content: 'Urgent requirement for Master Mariner on 50,000 DWT bulk carrier. Route: Asia to Europe. Requirements: STCW II/2, 2+ years as Master, experience with bulk carriers. Immediate start available.',
@@ -430,7 +434,7 @@ async function main() {
     }
   });
 
-  await prisma.posting.create({
+  const post3 = await prisma.posting.create({
     data: {
       title: 'Second Officer - Oil Tanker',
       content: 'Second Officer position available on VLCC. Requirements: STCW II/1, 1+ year as Second Officer, tanker experience preferred. Contract: 3 months on/3 months off.',
@@ -441,7 +445,7 @@ async function main() {
     }
   });
 
-  await prisma.posting.create({
+  const post4 = await prisma.posting.create({
     data: {
       title: 'Maritime Training Program - STCW Courses',
       content: 'Comprehensive STCW training programs available. Courses include: Basic Safety Training, Advanced Firefighting, Medical First Aid, and more. Next session starts March 1st, 2024.',
@@ -452,7 +456,7 @@ async function main() {
     }
   });
 
-  await prisma.posting.create({
+  const post5 = await prisma.posting.create({
     data: {
       title: 'Maritime Technology Exhibition 2024',
       content: 'Join us at the annual Maritime Technology Exhibition in Rotterdam. Showcasing the latest innovations in navigation, safety, and digital transformation. Free entry for registered maritime professionals.',
@@ -461,6 +465,37 @@ async function main() {
       organizationId: marineTech.id,
       createdById: exhibitor.id
     }
+  });
+
+  // Add comments for postings
+  await prismaAny.comment.createMany({
+    data: [
+      {
+        content: 'Is there a rotation schedule for this Chief Engineer role?',
+        postingId: post1.id,
+        userId: jobseeker1.id,
+      },
+      {
+        content: 'What is the expected joining date for the Master Mariner position?',
+        postingId: post2.id,
+        userId: jobseeker2.id,
+      },
+      {
+        content: 'Does the Second Officer role require prior tanker endorsement?',
+        postingId: post3.id,
+        userId: jobseeker1.id,
+      },
+      {
+        content: 'Are there weekend batches available for the STCW courses?',
+        postingId: post4.id,
+        userId: jobseeker2.id,
+      },
+      {
+        content: 'Will there be live demos at the exhibition?',
+        postingId: post5.id,
+        userId: exhibitor.id,
+      },
+    ],
   });
 
   // Create messages between users

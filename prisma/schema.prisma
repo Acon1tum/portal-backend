@@ -111,6 +111,8 @@ model User {
   sentMessages     Message[]        @relation("SenderMessages")
   notifications    Notification[]
   createdPostings  Posting[]
+  comments         Comment[]
+  favorites        PostingFavorite[]
 }
 
 model Account {
@@ -245,6 +247,8 @@ model Posting {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy      User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
   attachments    PostingAttachment[]
+  comments       Comment[]
+  favorites      PostingFavorite[]
 }
 
 model PostingAttachment {
@@ -258,6 +262,32 @@ model PostingAttachment {
   
   // Relationships
   posting    Posting  @relation(fields: [postingId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  postingId String   @db.Uuid
+  userId    String   @db.Uuid
+  
+  // Relationships
+  posting   Posting  @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PostingFavorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  postingId String   @db.Uuid
+  userId    String   @db.Uuid
+  
+  // Relationships
+  posting   Posting  @relation(fields: [postingId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postingId, userId]) // Ensures a user can only favorite a post once
 }
 
 // ============================================================================
