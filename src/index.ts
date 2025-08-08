@@ -55,7 +55,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: { secure: false } // Set secure to true if using HTTPS make this tru when production
 }));
-app.use(express.json());  
+app.use(express.json({ limit: '50mb' })); // Increased limit for file attachments
+app.use(express.urlencoded({ limit: '50mb', extended: true })); // For form data
 app.use(cookieParser());
 
 app.use(
@@ -68,7 +69,6 @@ app.use(
 );
 
 app.options('*', cors());
-app.use(express.json());
 
 // Mount auth routes under /auth
 app.use('/auth', authRouter);

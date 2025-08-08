@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const prismaAny = prisma as any;
 
 // Test endpoint to check user session and organization
 router.get('/test/user', asyncHandler(async (req, res) => {
@@ -98,6 +99,7 @@ router.get('/', asyncHandler(async (req, res) => {
         }
       },
       attachments: true,
+      _count: { select: { comments: true } }
     },
     orderBy: {
       createdAt: 'desc',
@@ -130,6 +132,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
         }
       },
       attachments: true,
+      _count: { select: { comments: true } }
     },
   });
 
@@ -162,6 +165,7 @@ router.get('/organization/:organizationId', asyncHandler(async (req, res) => {
         }
       },
       attachments: true,
+      _count: { select: { comments: true } }
     },
     orderBy: {
       createdAt: 'desc',
@@ -196,6 +200,7 @@ router.get('/type/:postType', asyncHandler(async (req, res) => {
         }
       },
       attachments: true,
+      _count: { select: { comments: true } }
     },
     orderBy: {
       createdAt: 'desc',
@@ -204,6 +209,119 @@ router.get('/type/:postType', asyncHandler(async (req, res) => {
 
   res.json(postings);
 }));
+
+// Get comments for a posting
+router.get('/:id/comments', asyncHandler(async (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  const { id } = req.params;
+  const comments = await prismaAny.comment.findMany({
+    where: { postingId: id },
+    include: {
+      user: { select: { id: true, name: true, email: true } }
+    },
+    orderBy: { createdAt: 'asc' }
+  });
+  res.json(comments);
+}));
+
+// Create a comment for a posting
+router.post('/:id/comments', asyncHandler(async (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  const { id } = req.params;
+  const { content } = req.body as { content?: string };
+  const userId = (req.session as any).user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (!content || content.trim().length === 0) {
+    return res.status(400).json({ error: 'Content is required' });
+  }
+
+  // Ensure posting exists
+  const posting = await prisma.posting.findUnique({ where: { id } });
+  if (!posting) {
+    return res.status(404).json({ error: 'Posting not found' });
+  }
+
+  const newComment = await prismaAny.comment.create({
+    data: {
+      content: content.trim(),
+      postingId: id,
+      userId,
+    },
+    include: {
+      user: { select: { id: true, name: true, email: true } }
+    }
+  });
+
+  res.status(201).json(newComment);
+}));
+
+// OPTIONS for comments (preflight)
+router.options('/:id/comments', (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  res.status(200).end();
+});
+
+// Delete a comment (by comment author, post author, or SUPERADMIN)
+router.delete('/:id/comments/:commentId', asyncHandler(async (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  const { id, commentId } = req.params;
+  const sessionUser = (req.session as any).user;
+  const userId = sessionUser?.id;
+  const role = sessionUser?.role;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const comment = await prismaAny.comment.findUnique({
+    where: { id: commentId },
+  });
+
+  if (!comment || comment.postingId !== id) {
+    return res.status(404).json({ error: 'Comment not found' });
+  }
+
+  const posting = await prisma.posting.findUnique({ where: { id } });
+  if (!posting) {
+    return res.status(404).json({ error: 'Posting not found' });
+  }
+
+  const isCommentOwner = comment.userId === userId;
+  const isPostOwner = posting.createdById === userId;
+  const isSuperAdmin = role === 'SUPERADMIN';
+
+  if (!isCommentOwner && !isPostOwner && !isSuperAdmin) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  await prismaAny.comment.delete({ where: { id: commentId } });
+  res.json({ success: true });
+}));
+
+// OPTIONS for delete comment
+router.options('/:id/comments/:commentId', (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  res.status(200).end();
+});
 
 // Create new posting
 router.post('/create', asyncHandler(async (req, res) => {
@@ -471,11 +589,27 @@ router.put('/toggle-publish/:id', asyncHandler(async (req, res) => {
 
 // Add attachment to posting
 router.post('/:id/attachments', asyncHandler(async (req, res) => {
+  // Add CORS headers for this specific endpoint
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  
   const { id } = req.params;
   const { url, fileName, fileType, size } = req.body;
   const userId = (req.session as any).user?.id;
 
+  console.log('Attachment upload request:', {
+    postingId: id,
+    fileName,
+    fileType,
+    size,
+    urlLength: url?.length || 0,
+    userId
+  });
+
   if (!userId) {
+    console.log('No user ID found in session');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -486,13 +620,16 @@ router.post('/:id/attachments', asyncHandler(async (req, res) => {
   });
 
   if (!existingPosting) {
+    console.log('Posting not found:', id);
     return res.status(404).json({ error: 'Posting not found' });
   }
 
   if (existingPosting.createdById !== userId && (req.session as any).user?.role !== 'SUPERADMIN') {
+    console.log('User not authorized to modify this posting');
     return res.status(403).json({ error: 'Forbidden' });
   }
 
+  try {
   const attachment = await prisma.postingAttachment.create({
     data: {
       url,
@@ -503,8 +640,23 @@ router.post('/:id/attachments', asyncHandler(async (req, res) => {
     },
   });
 
+    console.log('Attachment created successfully:', attachment.id);
   res.status(201).json(attachment);
+  } catch (error) {
+    console.error('Error creating attachment:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to create attachment', details: errorMessage });
+  }
 }));
+
+// Handle OPTIONS requests for attachment endpoint
+router.options('/:id/attachments', (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-email');
+  res.status(200).end();
+});
 
 // Delete attachment from posting
 router.delete('/attachments/:attachmentId', asyncHandler(async (req, res) => {
