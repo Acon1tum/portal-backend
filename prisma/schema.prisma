@@ -103,6 +103,10 @@ model User {
   currentJobStatus CurrentJobStatus?
   isEmailVerified  Boolean          @default(false)
   
+  // Profile images
+  profilePicture   String?          // Base64 encoded image or URL
+  coverPhoto       String?          // Base64 encoded image or URL
+  
   // Migration tracking fields
   migratedFromSupabase Boolean      @default(false)
   supabaseUserId       String?      // Store the original Supabase user ID
@@ -152,6 +156,10 @@ model Organization {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   userId             String?            @unique @db.Uuid
+  
+  // Profile images
+  profilePicture     String?          // Base64 encoded image or URL
+  coverPhoto         String?          // Base64 encoded image or URL
   
   // Relationships
   user               User?              @relation("UserOrganization", fields: [userId], references: [id]) // One-to-one

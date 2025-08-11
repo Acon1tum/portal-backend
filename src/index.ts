@@ -8,6 +8,7 @@ import roleRouter from './roles-and-permissions/role';
 import editRoleRouter from './roles-and-permissions/edit-roles';
 import userRouter from './users/users';
 import createUserRouter from './users/createUser';
+import updateUserRouter from './users/updateUser';
 import userProfileRouter from './auth/fetch-profile';
 import userDevicesRouter from './auth/user-devices/add-device';
 import checkSessionRouter from './auth/check-session';
@@ -64,7 +65,7 @@ app.use(
   cors({
     origin: true, // Allow all origins
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id', 'x-user-email'],
   })
 );
@@ -87,6 +88,7 @@ app.use('/roles', roleRouter);
 app.use('/roles/editRole', editRoleRouter);
 app.use('/users', userRouter);
 app.use('/users/create', createUserRouter);
+app.use('/users/update', updateUserRouter);
 app.use('/user/devices', userDevicesRouter);
 app.use('/user/profile', userProfileRouter);
 
@@ -119,6 +121,15 @@ app.use('/postings', postingRouter)
 // Basic route
 app.get('/', (req: Request, res: Response) => {
   res.send('Hello from Express with TypeScript!');
+});
+
+// Test endpoint for frontend connection
+app.get('/test', (req: Request, res: Response) => {
+  res.json({ 
+    message: 'Backend is running successfully!',
+    timestamp: new Date().toISOString(),
+    status: 'ok'
+  });
 });
 
 // WebSocket connection handling
