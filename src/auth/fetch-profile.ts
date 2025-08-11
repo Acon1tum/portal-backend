@@ -19,11 +19,16 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
 
-    // Fetch the user including their accounts (role is now an enum field, not a relation)
+    // Fetch the user including their accounts and organization (role is now an enum field, not a relation)
     const userProfile = await prisma.user.findUnique({
       where: { id },
       include: {
         accounts: true, // Include accounts
+        organization: {
+          include: {
+            taglineCategories: true
+          }
+        }, // Include organization if user has one
         // role is now an enum field, so no need to include it
       },
     });

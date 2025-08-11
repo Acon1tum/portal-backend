@@ -102,6 +102,8 @@ model User {
   userType         UserType?
   currentJobStatus CurrentJobStatus?
   isEmailVerified  Boolean          @default(false)
+  profilePicture   String?          // URL to profile picture
+  coverPhoto       String? 
   
   // Migration tracking fields
   migratedFromSupabase Boolean      @default(false)
@@ -123,7 +125,6 @@ model User {
 model Account {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                 String    @unique
-  password              String
   userId                String    @db.Uuid
   status                Status    @default(ACTIVE)
   createdAt             DateTime  @default(now())
@@ -152,6 +153,8 @@ model Organization {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   userId             String?            @unique @db.Uuid
+  profilePicture     String?            // URL to profile picture
+  coverPhoto         String?
   
   // Relationships
   user               User?              @relation("UserOrganization", fields: [userId], references: [id]) // One-to-one
@@ -224,6 +227,7 @@ model OrganizationDocument {
   url            String
   fileName       String
   fileType       String?
+  fileSize       Int?
   size           Int?
   description    String?
   uploadedAt     DateTime     @default(now())

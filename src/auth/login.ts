@@ -146,8 +146,7 @@ router.post(
       if (migrationResult && migrationResult.success) {
         response.migrationInfo = {
           migrated: true,
-          message: migrationResult.message,
-          supabaseUserId: user.supabaseUserId
+          message: migrationResult.message
         };
       }
 
