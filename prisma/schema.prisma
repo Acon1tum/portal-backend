@@ -103,6 +103,11 @@ model User {
   currentJobStatus CurrentJobStatus?
   isEmailVerified  Boolean          @default(false)
   
+  // Migration tracking fields
+  migratedFromSupabase Boolean      @default(false)
+  supabaseUserId       String?      // Store the original Supabase user ID
+  migrationDate        DateTime?    // When the migration happened
+  
   // Relationships
   accounts         Account[]
   organization     Organization?    @relation("UserOrganization") // One-to-one

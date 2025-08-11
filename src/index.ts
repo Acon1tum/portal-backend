@@ -30,6 +30,7 @@ import updateMessageStatus from './message/updateMessageStatus'
 import emailAndPassSignup from './auth/signup-email-and-pass/signup'
 import activitiesRouter from './activities/activities'
 import postingRouter from './posting/posting'
+import migrationRouter from './auth/migration-endpoints'
 import { initializeWebSocket, getIO } from './utils/websocket';
 
 const app = express();
@@ -73,6 +74,8 @@ app.options('*', cors());
 // Mount auth routes under /auth
 app.use('/auth', authRouter);
 
+// Migration endpoints (admin only) - temporarily disabled due to TypeScript issues
+// app.use('/auth/migration', migrationRouter);
 
 // signup for email and password only
 app.use('/auth/signup', emailAndPassSignup);
