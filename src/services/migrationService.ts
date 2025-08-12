@@ -53,12 +53,26 @@ export class MigrationService {
           }
         });
 
-        // Create account with hashed password
-        const hashedPassword = await bcrypt.hash(supabaseUser.password, 12);
+        // Create account with password - handle different password formats from Supabase
+        let finalPassword: string;
+        
+        // Check if the password from Supabase is already hashed
+        if (supabaseUser.password.startsWith('$2a$') || 
+            supabaseUser.password.startsWith('$2b$') || 
+            supabaseUser.password.startsWith('$2y$')) {
+          // Password is already bcrypt hashed, store as-is
+          finalPassword = supabaseUser.password;
+          console.log('Password from Supabase is already hashed, storing as-is');
+        } else {
+          // Password is plain text, hash it before storing
+          finalPassword = await bcrypt.hash(supabaseUser.password, 12);
+          console.log('Password from Supabase is plain text, hashing before storage');
+        }
+        
         await tx.account.create({
           data: {
             email: supabaseUser.email,
-            password: hashedPassword,
+            password: finalPassword,
             userId: newUser.id,
             status: 'ACTIVE',
           }

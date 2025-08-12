@@ -55,7 +55,13 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Set secure to true if using HTTPS make this tru when production
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // Only use secure cookies in production
+    httpOnly: true, // Prevent XSS attacks
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'lax' // Protect against CSRF
+  },
+  name: 'portal-session' // Custom session name
 }));
 app.use(express.json({ limit: '50mb' })); // Increased limit for file attachments
 app.use(express.urlencoded({ limit: '50mb', extended: true })); // For form data

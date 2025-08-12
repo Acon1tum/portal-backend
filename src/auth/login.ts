@@ -38,6 +38,9 @@ router.post(
   asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
+    console.log(`🔍 Login attempt for email: ${email}`);
+    console.log(`🔐 Password length from request: ${password.length}`);
+
     // First, try to find user in local database
     let user = await prisma.user.findUnique({
       where: { email },
@@ -56,22 +59,67 @@ router.post(
       // Look for an account that has a non-null password
       const account = user.accounts.find((acc: any) => acc.password);
       if (!account || !account.password) {
+        console.log(`❌ No password found for user: ${email}`);
         res.status(401).json({ error: 'Invalid credentials' });
         return;
       }
 
+      console.log(`🔍 User found locally: ${email}`);
+      console.log(`🔐 Stored password format: ${account.password.substring(0, 20)}...`);
+      console.log(`🔐 Password length: ${account.password.length}`);
+
       // Check if the account status is INACTIVE
       if (account.status === 'INACTIVE') {
+        console.log(`❌ Account is inactive for user: ${email}`);
         res.status(403).json({ error: 'ACCOUNT IS INACTIVE' });
         return;
       }
 
       // Compare the provided password with the stored (hashed) password
+      console.log(`🔐 Attempting password comparison for user: ${email}`);
       const isMatch = await bcrypt.compare(password, account.password);
+      console.log(`🔐 Password comparison result: ${isMatch}`);
+      
       if (!isMatch) {
-        res.status(401).json({ error: 'Invalid credentials' });
-        return;
+        console.log(`❌ Password mismatch for user: ${email}`);
+        
+        // If this is a migrated user, try Supabase authentication as fallback
+        if (user.migratedFromSupabase) {
+          console.log(`🔄 User was migrated from Supabase, trying Supabase authentication as fallback`);
+          
+          try {
+            const supabaseAuth = await SupabaseService.authenticateUser(email, password);
+            
+            if (supabaseAuth.success && supabaseAuth.user) {
+              console.log(`✅ Supabase authentication successful, updating local password`);
+              
+              // Update the local password with the correct one from Supabase
+              const newHashedPassword = await bcrypt.hash(password, 12);
+              await prisma.account.update({
+                where: { id: account.id },
+                data: { password: newHashedPassword }
+              });
+              
+              console.log(`✅ Local password updated successfully`);
+              
+              // Continue with the login process
+            } else {
+              console.log(`❌ Supabase authentication also failed`);
+              res.status(401).json({ error: 'Invalid credentials' });
+              return;
+            }
+          } catch (error) {
+            console.error('Supabase fallback authentication error:', error);
+            res.status(401).json({ error: 'Invalid credentials' });
+            return;
+          }
+        } else {
+          res.status(401).json({ error: 'Invalid credentials' });
+          return;
+        }
       }
+      
+      console.log(`✅ Password verified for user: ${email}`);
     } else {
       // User doesn't exist locally, try Supabase authentication
       try {
