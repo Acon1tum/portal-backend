@@ -236,6 +236,53 @@ export class SupabaseService {
   }
 
   /**
+   * Get user details by email
+   */
+  static async getUserDetailsByEmail(email: string): Promise<SupabaseUserDetails | null> {
+    try {
+      // First get the user ID from UserAccounts
+      const { data: userAccount, error: userError } = await supabase
+        .from('UserAccounts')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userError || !userAccount) {
+        console.error('User not found in UserAccounts:', userError);
+        return null;
+      }
+
+      // Then get user details using the user ID (both tables use same id)
+      const { data: userDetails, error: detailsError } = await supabase
+        .from('UserDetails')
+        .select('*')
+        .eq('id', userAccount.id)
+        .single();
+
+      if (detailsError) {
+        console.error('Error fetching user details by email:', detailsError);
+        return null;
+      }
+
+      return {
+        id: userDetails.id,
+        user_id: userDetails.id,
+        name: userDetails.name,
+        userType: userDetails.userType,
+        userRole: userDetails.userRole,
+        address: userDetails.address,
+        phone: userDetails.phone,
+        sex: userDetails.sex,
+        bday: userDetails.bday,
+        profileImage: userDetails.profileImage
+      };
+    } catch (error) {
+      console.error('Error in getUserDetailsByEmail:', error);
+      return null;
+    }
+  }
+
+  /**
    * Check if user exists in Supabase
    */
   static async userExists(email: string): Promise<boolean> {

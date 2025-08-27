@@ -14,10 +14,11 @@ const asyncHandler = (
 };
 
 // Middleware to check if user is admin (you can customize this)
-const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+const requireAdmin = (req: Request, res: Response, next: NextFunction): void => {
   const session = req.session as any;
   if (!session.user || session.user.role !== 'SUPERADMIN') {
-    return res.status(403).json({ error: 'Admin access required' });
+    res.status(403).json({ error: 'Admin access required' });
+    return;
   }
   next();
 };
@@ -26,7 +27,7 @@ const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
 router.get('/status/:email', requireAdmin, asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { email } = req.params;
   const status = await MigrationService.getMigrationStatus(email);
-  
+
   res.json({
     email,
     ...status
@@ -37,7 +38,7 @@ router.get('/status/:email', requireAdmin, asyncHandler(async (req: Request, res
 router.get('/needs-migration/:email', requireAdmin, asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { email } = req.params;
   const needsMigration = await MigrationService.needsMigration(email);
-  
+
   res.json({
     email,
     needsMigration
@@ -47,7 +48,7 @@ router.get('/needs-migration/:email', requireAdmin, asyncHandler(async (req: Req
 // Manual migration for a specific user
 router.post('/migrate-user', requireAdmin, asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { email, password } = req.body;
-  
+
   if (!email || !password) {
     res.status(400).json({ error: 'Email and password are required' });
     return;
@@ -55,7 +56,7 @@ router.post('/migrate-user', requireAdmin, asyncHandler(async (req: Request, res
 
   // First authenticate with Supabase
   const supabaseAuth = await SupabaseService.authenticateUser(email, password);
-  
+
   if (!supabaseAuth.success || !supabaseAuth.user) {
     res.status(401).json({ error: 'Invalid Supabase credentials' });
     return;
@@ -85,7 +86,7 @@ router.post('/migrate-user', requireAdmin, asyncHandler(async (req: Request, res
 // Bulk migration for multiple users
 router.post('/bulk-migrate', requireAdmin, asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { emails } = req.body;
-  
+
   if (!emails || !Array.isArray(emails) || emails.length === 0) {
     res.status(400).json({ error: 'Emails array is required' });
     return;
@@ -98,7 +99,7 @@ router.post('/bulk-migrate', requireAdmin, asyncHandler(async (req: Request, res
   }
 
   const result = await MigrationService.bulkMigrateUsers(emails);
-  
+
   res.json({
     success: true,
     ...result
@@ -109,7 +110,7 @@ router.post('/bulk-migrate', requireAdmin, asyncHandler(async (req: Request, res
 router.get('/migrated-users', requireAdmin, asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { PrismaClient } = require('@prisma/client');
   const prisma = new PrismaClient();
-  
+
   const migratedUsers = await prisma.user.findMany({
     where: {
       migratedFromSupabase: true

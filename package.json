@@ -30,7 +30,7 @@
     "prisma:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.6.0",
+    "@prisma/client": "^6.14.0",
     "@reduxjs/toolkit": "^2.6.1",
     "@supabase/supabase-js": "^2.49.4",
     "bcrypt": "^5.1.1",

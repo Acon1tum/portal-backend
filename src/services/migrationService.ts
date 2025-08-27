@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole, UserType } from '@prisma/client';
 import { SupabaseService, SupabaseUserAccount, SupabaseUserDetails } from './supabaseService';
 import bcrypt from 'bcryptjs';
 
@@ -11,7 +11,77 @@ export interface MigrationResult {
   error?: string;
 }
 
+// Helper function to map Supabase role to Prisma role
+const mapSupabaseRoleToPrismaRole = (supabaseRole?: string): UserRole => {
+  switch (supabaseRole) {
+    case 'Job Seeker':
+      return UserRole.JOBSEEKER;
+    case 'Manning Agency':
+      return UserRole.MANNING_AGENCY;
+    case 'SUPERADMIN':
+      return UserRole.SUPERADMIN;
+    case 'EXHIBITOR':
+      return UserRole.EXHIBITOR;
+    case 'SPONSOR':
+      return UserRole.SPONSOR;
+    default:
+      return UserRole.VISITOR;
+  }
+};
+
+// Helper function to map Supabase type to Prisma type
+const mapSupabaseTypeToPrismaType = (supabaseType?: string): UserType => {
+  switch (supabaseType) {
+    case 'SEAFARER':
+      return UserType.SEAFARER;
+    case 'CORPORATE_PROFESSIONAL':
+      return UserType.CORPORATE_PROFESSIONAL;
+    case 'STUDENTS':
+      return UserType.STUDENTS;
+    case 'SUPERADMIN':
+      return UserType.SUPERADMIN;
+    default:
+      return UserType.OTHERS;
+  }
+};
+
 export class MigrationService {
+  /**
+   * Check if user is eligible for migration based on userType and userRole
+   */
+  private static isEligibleForMigration(userDetails?: SupabaseUserDetails): boolean {
+    if (!userDetails) {
+      return false;
+    }
+
+    const { userType, userRole } = userDetails;
+
+    if (!userType) {
+      return false;
+    }
+
+    switch (userType) {
+      case 'CORPORATE_PROFESSIONAL':
+        // CORPORATE_PROFESSIONAL can have any userRole
+        return true;
+
+      case 'SEAFARER':
+        // SEAFARER only allowed if userRole is "Job Seeker"
+        return userRole === 'Job Seeker';
+
+      case 'STUDENTS':
+        // STUDENTS only allowed if userRole is "Job Seeker"
+        return userRole === 'Job Seeker';
+
+      case 'OTHERS':
+        // OTHERS only allowed if userRole is "Manning Agency" or "Job Seeker"
+        return userRole === 'Manning Agency' || userRole === 'Job Seeker';
+
+      default:
+        return false;
+    }
+  }
+
   /**
    * Migrate user from Supabase to local database
    */
@@ -20,6 +90,18 @@ export class MigrationService {
     supabaseUserDetails?: SupabaseUserDetails
   ): Promise<MigrationResult> {
     try {
+      // Validate user eligibility for migration
+      if (!this.isEligibleForMigration(supabaseUserDetails)) {
+        const userType = supabaseUserDetails?.userType || 'unknown';
+        const userRole = supabaseUserDetails?.userRole || 'unknown';
+        
+        return {
+          success: false,
+          message: `Migration denied: UserType ''''${userType}'''' with UserRole ''''${userRole}'''' is not allowed. Valid combinations: CORPORATE_PROFESSIONAL (any role), SEAFARER (Job Seeker only), STUDENTS (Job Seeker only), OTHERS (Manning Agency or Job Seeker only).`,
+          error: 'INVALID_USER_CREDENTIALS'
+        };
+      }
+
       // Check if user already exists in local database
       const existingUser = await prisma.user.findUnique({
         where: { email: supabaseUser.email }
@@ -43,8 +125,8 @@ export class MigrationService {
               ? `${supabaseUserDetails.name?.first || ''} ${supabaseUserDetails.name?.last || ''}`.trim() || null
               : null,
             sex: supabaseUserDetails?.sex === 'FEMALE' ? 'FEMALE' : 'MALE',
-            role: supabaseUserDetails?.userRole === 'SUPERADMIN' ? 'SUPERADMIN' : 'VISITOR',
-            userType: supabaseUserDetails?.userType === 'SUPERADMIN' ? 'SUPERADMIN' : 'OTHERS',
+            role: mapSupabaseRoleToPrismaRole(supabaseUserDetails?.userRole),
+            userType: mapSupabaseTypeToPrismaType(supabaseUserDetails?.userType),
             currentJobStatus: 'NOT_LOOKING', // Default status
             isEmailVerified: true, // Assume verified if coming from Supabase
             migratedFromSupabase: true,
@@ -105,7 +187,7 @@ export class MigrationService {
   }
 
   /**
-   * Check if user needs migration
+   * Check if user needs migration (only for allowed userTypes)
    */
   static async needsMigration(email: string): Promise<boolean> {
     try {
@@ -114,10 +196,18 @@ export class MigrationService {
         where: { email }
       });
 
-      // If user doesn't exist locally but exists in Supabase, migration is needed
+      // If user doesn't exist locally but exists in Supabase, check if they're eligible for migration
       if (!localUser) {
         const existsInSupabase = await SupabaseService.userExists(email);
-        return existsInSupabase;
+        
+        if (existsInSupabase) {
+          // Check user eligibility for migration
+          const userDetails = await SupabaseService.getUserDetailsByEmail(email);
+          
+          if (this.isEligibleForMigration(userDetails || undefined)) {
+            return true;
+          }
+        }
       }
 
       return false;

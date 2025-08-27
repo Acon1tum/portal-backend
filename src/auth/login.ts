@@ -7,7 +7,7 @@ import 'express-session'; // Importing express-session to use our session augmen
 import { UserRole, UserType, CurrentJobStatus } from '@prisma/client';
 
 // Import Supabase and migration services
-import SupabaseService from '../services/supabaseService';
+import SupabaseService, { SupabaseUserDetails } from '../services/supabaseService';
 import MigrationService from '../services/migrationService';
 
 const router = express.Router();
@@ -22,6 +22,40 @@ interface SessionUser {
   userType: UserType | null;
   currentJobStatus: CurrentJobStatus | null;
 }
+
+// Helper function to check if user is eligible for migration
+const isEligibleForMigration = (userDetails?: SupabaseUserDetails): boolean => {
+  if (!userDetails) {
+    return false;
+  }
+
+  const { userType, userRole } = userDetails;
+
+  if (!userType) {
+    return false;
+  }
+
+  switch (userType) {
+    case 'CORPORATE_PROFESSIONAL':
+      // CORPORATE_PROFESSIONAL can have any userRole
+      return true;
+
+    case 'SEAFARER':
+      // SEAFARER only allowed if userRole is "Job Seeker"
+      return userRole === 'Job Seeker';
+
+    case 'STUDENTS':
+      // STUDENTS only allowed if userRole is "Job Seeker"
+      return userRole === 'Job Seeker';
+
+    case 'OTHERS':
+      // OTHERS only allowed if userRole is "Manning Agency" or "Job Seeker"
+      return userRole === 'Manning Agency' || userRole === 'Job Seeker';
+
+    default:
+      return false;
+  }
+};
 
 // Async error handling helper with explicit types
 const asyncHandler = (
@@ -53,8 +87,61 @@ router.post(
     let migrationResult = null;
 
     if (user) {
-      // User exists locally, proceed with local authentication
+      // User exists locally, but we need to check if they should still have access
       isLocalUser = true;
+      
+      // For non-migrated users (created via signup), check if they have valid credentials in Supabase
+      if (!user.migratedFromSupabase) {
+        console.log(`🔍 Local user not migrated from Supabase, checking Supabase eligibility: ${email}`);
+        
+        try {
+          const supabaseAuth = await SupabaseService.authenticateUser(email, password);
+          
+          if (supabaseAuth.success && supabaseAuth.user) {
+            // Check if user is eligible based on Supabase data
+            if (!isEligibleForMigration(supabaseAuth.userDetails)) {
+              const userType = supabaseAuth.userDetails?.userType || 'unknown';
+              const userRole = supabaseAuth.userDetails?.userRole || 'unknown';
+              
+              console.log(`❌ Local user with UserType '${userType}' and UserRole '${userRole}' is not eligible for access`);
+              res.status(403).json({ 
+                error: 'Access denied', 
+                message: 'Your account type is not authorized to access this system. Valid combinations: CORPORATE_PROFESSIONAL (any role), SEAFARER (Job Seeker only), STUDENTS (Job Seeker only), OTHERS (Manning Agency or Job Seeker only).',
+                userType: userType,
+                userRole: userRole
+              });
+              return;
+            }
+            
+            // Update migration status for this user
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                migratedFromSupabase: true,
+                supabaseUserId: supabaseAuth.user.id,
+                migrationDate: new Date()
+              }
+            });
+            
+            console.log(`✅ Local user validated against Supabase and marked as migrated`);
+          } else {
+            // User exists locally but not in Supabase - this might be a directly created account
+            console.log(`⚠️ Local user not found in Supabase - access denied for security`);
+            res.status(403).json({ 
+              error: 'Access denied', 
+              message: 'Account not found in authorization system. Please contact your administrator.',
+            });
+            return;
+          }
+        } catch (error) {
+          console.error('Error validating local user against Supabase:', error);
+          res.status(403).json({ 
+            error: 'Access denied', 
+            message: 'Unable to validate account credentials. Please contact your administrator.',
+          });
+          return;
+        }
+      }
       
       // Look for an account that has a non-null password
       const account = user.accounts.find((acc: any) => acc.password);
@@ -126,7 +213,26 @@ router.post(
         const supabaseAuth = await SupabaseService.authenticateUser(email, password);
         
         if (supabaseAuth.success && supabaseAuth.user) {
-          // User authenticated with Supabase, now migrate to local database
+          // Check if user is eligible for migration
+          const userType = supabaseAuth.userDetails?.userType;
+          const userRole = supabaseAuth.userDetails?.userRole;
+          
+          console.log(`🔍 Checking user eligibility for migration: UserType='${userType}', UserRole='${userRole}'`);
+          
+          if (!isEligibleForMigration(supabaseAuth.userDetails)) {
+            console.log(`❌ User with UserType '${userType}' and UserRole '${userRole}' is not allowed to migrate and login`);
+            res.status(403).json({ 
+              error: 'Access denied', 
+              message: 'Access denied for this user combination. Valid combinations: CORPORATE_PROFESSIONAL (any role), SEAFARER (Job Seeker only), STUDENTS (Job Seeker only), OTHERS (Manning Agency or Job Seeker only).',
+              userType: userType,
+              userRole: userRole
+            });
+            return;
+          }
+          
+          console.log(`✅ User with UserType '${userType}' and UserRole '${userRole}' is eligible for migration`);
+          
+          // User authenticated with Supabase and has valid userType, now migrate to local database
           migrationResult = await MigrationService.migrateUserFromSupabase(
             supabaseAuth.user,
             supabaseAuth.userDetails
